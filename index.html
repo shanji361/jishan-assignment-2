@@ -3,59 +3,148 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KMeans Clustering Demo</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>KMeans Clustering</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
-    <div class="container">
-        <h1>KMeans Clustering Web App</h1>
+    <h1>KMeans Clustering with Manual Initialization</h1>
+    <label for="num_clusters">Number of Clusters (k): </label>
+    <input type="number" id="num_clusters" value="3" min="1">
+
+    <label for="init_method">Initialization Method: </label>
+    <select id="init_method">
+        <option value="random">Random</option>
+        <option value="kmeans++">KMeans++</option>
+        <option value="farthest_first">Farthest First</option>
+        <option value="manual">Manual</option>
+    </select>
+
+    <div id="plot"></div>
+
+    <script>
+        let selectedPoints = [];
+        let maxCentroids = 0;
+
+        async function fetchData() {
+            const response = await fetch('/data');
+            return response.json();
+        }
+
+        async function fetchCentroids(method, nClusters, manualCentroids = []) {
+            const response = await fetch('/run_kmeans', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    method: method,
+                    n_clusters: nClusters,
+                    manual_centroids: manualCentroids 
+                }),
+            });
+            return response.json();
+        }
+
+        async function plotData(centroids = [], labels = []) {
+            const data = await fetchData();
+            const colors = labels.map(label => getColorForCluster(label));
+
+            const trace1 = {
+                x: data.map(point => point[0]),
+                y: data.map(point => point[1]),
+                mode: 'markers',
+                type: 'scatter',
+                name: 'Data Points',
+                marker: {
+                    size: 10,
+                    color: colors,
+                    opacity: 0.8
+                }
+            };
+
+            const trace2 = {
+                x: centroids.map(centroid => centroid[0]),
+                y: centroids.map(centroid => centroid[1]),
+                mode: 'markers',
+                type: 'scatter',
+                name: 'Centroids',
+                marker: {
+                    size: 12,
+                    color: 'red',
+                    symbol: 'cross'
+                }
+            };
+
+            const layout = {
+                title: 'KMeans Clustering',
+                xaxis: { title: 'X-axis' },
+                yaxis: { title: 'Y-axis' }
+            };
+
+            Plotly.newPlot('plot', [trace1, trace2], layout);
+        }
+
+        document.getElementById('plot').on('plotly_click', function(data) {
+            const method = document.getElementById('init_method').value;
+            if (method === 'manual' && selectedPoints.length < maxCentroids) {
+                const clickedPoint = data.points[0]; // Get clicked point data
+                const x = clickedPoint.x;
+                const y = clickedPoint.y;
+                selectedPoints.push([x, y]); // Store the selected point
+
+             
+                document.getElementById('centroidInputs').innerHTML = selectedPoints.map((p, i) => `Centroid ${i + 1}: (${p[0]}, ${p[1]})`).join('<br>');
+            }
+        });
+
+        async function stepThrough() {
+            const nClusters = document.getElementById('num_clusters').value;
+            const method = document.getElementById('init_method').value;
+
+            if (method === 'manual' && selectedPoints.length !== nClusters) {
+                alert(`Please select ${nClusters} centroids on the plot.`);
+                return;
+            }
+
+            const result = await fetchCentroids(method, nClusters, selectedPoints);
+            const centroids = result.centroids;
+            const labels = result.labels;
+
+            await plotData(centroids, labels);
+        }
+
+     
+        document.getElementById('num_clusters').addEventListener('change', function() {
+            const k = parseInt(this.value);
+            maxCentroids = k; 
+            if (document.getElementById('init_method').value === 'manual') {
+                selectedPoints = []; 
+                document.getElementById('centroidInputs').innerHTML = 'Click on the plot to select centroids';
+            }
+        });
+
+    
+        document.getElementById('plot').on('plotly_click', function(data) {
+            const method = document.getElementById('init_method').value;
+            if (method === 'manual' && selectedPoints.length < maxCentroids) {
+                const clickedPoint = data.points[0]; // Get clicked point data
+                const x = clickedPoint.x;
+                const y = clickedPoint.y;
+                selectedPoints.push([x, y]); 
+
+               
+                document.getElementById('centroidInputs').innerHTML = selectedPoints.map((p, i) => `Centroid ${i + 1}: (${p[0]}, ${p[1]})`).join('<br>');
+
+               
+                if (selectedPoints.length === maxCentroids) {
+                    document.getElementById('runKMeans').disabled = false; // Enable button to run KMeans
+                }
+    }
+});
 
 
-
-
-        <div class="controls">
-            <label for="num_clusters">Number of Clusters (k):</label>
-            <input type="number" id="num_clusters" name="num_clusters" min="1" max="10" value="3">
-
-
-
-
-            <label for="init_method">Initialization Method:</label>
-            <select id="init_method">
-                <option value="random">Random</option>
-                <option value="farthest_first">Farthest First</option>
-                <option value="kmeans++">KMeans++</option>
-                <option value="manual">Manual</option>
-            </select>
-
-
-
-
-            <button onclick="generateNewDataset()">Generate New Dataset</button>
-            <button onclick="runToConvergence()">Run KMeans</button>
-            <button onclick="stepThrough()">Step Through KMeans</button>
-            <button onclick="resetAlgorithm()">Reset Algorithm</button>
-        </div>
-
-
-
-
-        <div id="plot"></div>
-    </div>
-
-
-
-
-    <script src="/static/app.js"></script>
+        document.addEventListener('DOMContentLoaded', plotData);
+    </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
