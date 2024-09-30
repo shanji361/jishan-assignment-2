@@ -3,7 +3,6 @@ import random
 
 
 
-
 class KMeans:
     def __init__(self, n_clusters=3, max_iter=100, init_method="random"):
         self.n_clusters = int(n_clusters)
@@ -27,6 +26,8 @@ class KMeans:
 
         print(f"Initial centroids using {self.init_method}: {self.centroids}")
 
+        if self.centroids is None or len(self.centroids) == 0:
+            raise ValueError("Centroids have not been initialized correctly.")
 
         for _ in range(self.max_iter):
             self.labels = self.assign_clusters(X)
@@ -71,8 +72,5 @@ class KMeans:
             if len(X[self.labels == i]) > 0:
                 centroids.append(X[self.labels == i].mean(axis=0))
             else:
-                centroids.append(self.centroids[i])  # Keep the old centroid if empty
+                centroids.append(self.centroids[i])  
         return np.array(centroids)
-
-
-
